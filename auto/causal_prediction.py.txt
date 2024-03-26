@@ -1,0 +1,28 @@
+import pandas as pd
+from sklearn.linear_model import LinearRegression
+
+# Load the CSV file
+file_path = 'your_data.csv'  # Update this with the path to your CSV file
+df = pd.read_csv(file_path)
+
+# Prepare the data
+df['date'] = pd.to_datetime(df['date'])
+df_grouped = df.groupby('date').mean()
+
+X = df_grouped[['predictor']].values
+y = df_grouped[['responder']].values
+
+# Train a linear regression model
+classifier = LinearRegression()
+classifier.fit(X, y)
+
+# Generate predictions
+predictions = classifier.predict(X)
+
+# Add predictions to the dataframe
+df_grouped['predicted_responder'] = predictions
+
+# Save the results
+df_grouped.to_csv('predicted_responses.csv')
+
+print('Causal prediction completed and saved to predicted_responses.csv')
