@@ -19,10 +19,10 @@ def write_python_file(args):
     file_name = args.get("file_name")
     file_contents = args.get("file_contents")
     # Write the script to file_name under the 'auto' directory
-    f = open(f"auto/{file_name}", "w")
+    f = open(file_name, "w")
     f.write(file_contents)
     f.close()
-    print(f"Wrote contents to auto/{file_name} successfully!")
+    print(f"Wrote contents to {file_name} successfully!")
     return json.dumps({})
 
 
@@ -53,7 +53,7 @@ def create_virtual_env(args):
     subprocess.run(
         [f"{directory}/venv/bin/pip", "install", "-r", f"{directory}/requirements.txt"]
     )
-    return json.dumps({"virtual_env": f"{directory}/venv"})
+    return json.dumps({"directory": directory})
 
 
 # All available functions
@@ -82,7 +82,8 @@ tools = [
                 "properties": {
                     "file_name": {
                         "type": "string",
-                        "description": "The file name.",
+                        "description": """The file name. This should be prefaced by the same directory
+                        that the rest of the project is being built in.""",
                     },
                     "file_contents": {
                         "type": "string",
@@ -223,11 +224,12 @@ MY_ASSISTANTS = {
     "planner": {
         "system_prompt": """You are a high level planner for a group of other GPTs that code.
         You will be given a task, or updates about the progress on tasks, and be expected to
-        plan or replan, outputting a list of single bullet points, each of which look something like
-        'Write the code for a starting app' or 'Write the backend'. Always use React for front-end, AWS for cloud,
-        and Flask for back-end. Make similar types of design and implementation decisions yourself. When
-        prompted to create a virtual environment, do not build more than one. Instead, install all the
-        necessary package dependencies in just one virtual environment.""",
+        plan or replan. Output a list of single bullet points, each of which look something like
+        'Write the code for a starting app' or 'Write the backend'. Always use React for front-end,
+        AWS for cloud, and Flask for back-end. Make similar types of design and implementation
+        decisions yourself. When prompted to create a virtual environment, do not build more than one.
+        Instead, install all the necessary package dependencies in just one virtual environment.
+        Do all the environment-related setup first before tackling any other item.""",
         "description": "The high-level planner of a project",
     },
     "driver": {
