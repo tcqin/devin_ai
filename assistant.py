@@ -14,16 +14,28 @@ DEBUG = True
 
 
 # Functions
-def write_python_file(args):
-    # Decode arguments
-    file_name = args.get("file_name")
-    file_contents = args.get("file_contents")
-    # Write the script to file_name under the 'auto' directory
+def write_file(file_name, file_contents):
+    # Write the script to file_name
+    os.makedirs(os.path.dirname(file_name), exist_ok=True)
     f = open(file_name, "w")
     f.write(file_contents)
     f.close()
     print(f"Wrote contents to {file_name} successfully!")
-    return json.dumps({})
+    return json.dumps({"file_name": file_name})
+
+
+def write_python_file(args):
+    # Decode arguments
+    file_name = args.get("file_name")
+    file_contents = args.get("file_contents")
+    return write_file(file_name, file_contents)
+
+
+def write_javascript_file(args):
+    # Decode arguments
+    file_name = args.get("file_name")
+    file_contents = args.get("file_contents")
+    return write_file(file_name, file_contents)
 
 
 def run_python_script(args):
@@ -60,6 +72,7 @@ def create_virtual_env(args):
 available_functions = {
     # For writing
     "write_python_file": write_python_file,
+    "write_javascript_file": write_javascript_file,
     # For running
     "run_python_script": run_python_script,
     # Virtual environments
@@ -83,11 +96,36 @@ tools = [
                     "file_name": {
                         "type": "string",
                         "description": """The file name. This should be prefaced by the same directory
-                        that the rest of the project is being built in.""",
+                        that the rest of the project is being built in. If there is no current project
+                        being worked on, then default to beginning the file name with 'auto/'.""",
                     },
                     "file_contents": {
                         "type": "string",
                         "description": "The contents of the Python file.",
+                    },
+                },
+                "required": ["file_name", "file_contents"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "write_javascript_file",
+            "description": """Create and write a Javascript file for the user. Only use for Javascript files.
+            Do not use for any other language such as bash scripts.""",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "file_name": {
+                        "type": "string",
+                        "description": """The file name. This should be prefaced by the same directory
+                        that the rest of the project is being built in. If there is no current project
+                        being worked on, then default to beginning the file name with 'auto/'.""",
+                    },
+                    "file_contents": {
+                        "type": "string",
+                        "description": "The contents of the Javascript file.",
                     },
                 },
                 "required": ["file_name", "file_contents"],
@@ -129,7 +167,8 @@ tools = [
             "description": """Create a Python virtual environment for future code development.
             Please include contents for any requirements file that will be installed using pip.
             Only create one virtual environment per user input, which can store all the necessary
-            requirements.""",
+            requirements. Make sure the virtual environment is created before any additional work
+            is done on any code project.""",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -191,6 +230,10 @@ class EventHandler(AssistantEventHandler):
             print(f"run_status: {current_run.status}")
         if current_run.status == "requires_action":
             tool_outputs = []
+            if DEBUG:
+                print(
+                    f"Tool calls: {current_run.required_action.submit_tool_outputs.tool_calls}"
+                )
             for tool_call in current_run.required_action.submit_tool_outputs.tool_calls:
                 if tool_call.type == "function":
                     function_name = tool_call.function.name
@@ -203,14 +246,14 @@ class EventHandler(AssistantEventHandler):
                             "output": json.dumps(function_response),
                         }
                     )
-                if current_run.required_action.type == "submit_tool_outputs":
-                    with client.beta.threads.runs.submit_tool_outputs_stream(
-                        thread_id=thread_id,
-                        run_id=run_id,
-                        tool_outputs=tool_outputs,
-                        event_handler=EventHandler(),
-                    ) as stream:
-                        stream.until_done()
+            if current_run.required_action.type == "submit_tool_outputs":
+                with client.beta.threads.runs.submit_tool_outputs_stream(
+                    thread_id=thread_id,
+                    run_id=run_id,
+                    tool_outputs=tool_outputs,
+                    event_handler=EventHandler(),
+                ) as stream:
+                    stream.until_done()
         else:
             pass
 
@@ -225,11 +268,18 @@ MY_ASSISTANTS = {
         "system_prompt": """You are a high level planner for a group of other GPTs that code.
         You will be given a task, or updates about the progress on tasks, and be expected to
         plan or replan. Output a list of single bullet points, each of which look something like
-        'Write the code for a starting app' or 'Write the backend'. Always use React for front-end,
-        AWS for cloud, and Flask for back-end. Make similar types of design and implementation
-        decisions yourself. When prompted to create a virtual environment, do not build more than one.
-        Instead, install all the necessary package dependencies in just one virtual environment.
-        Do all the environment-related setup first before tackling any other item.""",
+        'Set up the project directory and initialize the web app with React' or 'Write the backend'.
+        Always use React for front-end, AWS for cloud, Flask for back-end, and Netlify for deployment.
+        Make similar types of design and implementation decisions yourself.
+        
+        If possible, give a clear directory structure of any code project that you are given.
+        
+        If prompted to create a virtual environment, build the environment in the parent directory
+        of the suggested project directory structure. Do not build more than one virtual environment.
+        Create the virtual environment before writing any code.
+        
+        Always assume that the user wants you to proceed with any code development without asking for
+        additional affirmation.""",
         "description": "The high-level planner of a project",
     },
     "driver": {
