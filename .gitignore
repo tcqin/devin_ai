@@ -4,3 +4,6 @@ openai-env/*
 
 # Miscellaneous
 .DS_Store
+
+# Auto-generated directories
+auto/*/
