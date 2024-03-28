@@ -4,6 +4,11 @@ openai-env/*
 
 # Miscellaneous
 .DS_Store
+.vscode
+__pycache__/*
 
 # Auto-generated directories
 auto/*/
+
+# Local Netlify folder
+.netlify

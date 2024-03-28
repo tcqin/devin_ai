@@ -1,5 +1,7 @@
 from openai import OpenAI
 
+from functions import *
+
 import os
 import time
 import json
@@ -10,74 +12,7 @@ from typing_extensions import override
 from openai import AssistantEventHandler
 
 # For Debugging reasons
-DEBUG = True
-
-
-# Functions
-def write_file(file_name, file_contents):
-    # Write the script to file_name
-    os.makedirs(os.path.dirname(file_name), exist_ok=True)
-    f = open(file_name, "w")
-    f.write(file_contents)
-    f.close()
-    print(f"Wrote contents to {file_name} successfully!")
-    return json.dumps({"file_name": file_name})
-
-
-def write_python_file(args):
-    # Decode arguments
-    file_name = args.get("file_name")
-    file_contents = args.get("file_contents")
-    return write_file(file_name, file_contents)
-
-
-def write_javascript_file(args):
-    # Decode arguments
-    file_name = args.get("file_name")
-    file_contents = args.get("file_contents")
-    return write_file(file_name, file_contents)
-
-
-def run_python_script(args):
-    # Decode arguments
-    file_name = args.get("file_name")
-    directory = args.get("directory")
-    arguments = args.get("arguments", [])
-    # Run the python script
-    output = subprocess.run([f"{directory}/venv/bin/python", file_name] + arguments)
-    return json.dumps({"output": output})
-
-
-def create_virtual_env(args):
-    # Decode arguments
-    directory = args.get("directory")
-    requirements_content = args.get("requirements_content")
-    # Create the directory
-    if not os.path.isdir(directory):
-        subprocess.run(["mkdir", directory])
-    # Write the requirements
-    f = open(f"{directory}/requirements.txt", "w")
-    f.write(requirements_content)
-    f.close()
-    # Create the environment and install relevant requirements
-    venv_location = os.path.join(directory, "venv")
-    venv.create(venv_location, with_pip=True)
-    subprocess.run(
-        [f"{directory}/venv/bin/pip", "install", "-r", f"{directory}/requirements.txt"]
-    )
-    return json.dumps({"directory": directory})
-
-
-# All available functions
-available_functions = {
-    # For writing
-    "write_python_file": write_python_file,
-    "write_javascript_file": write_javascript_file,
-    # For running
-    "run_python_script": run_python_script,
-    # Virtual environments
-    "create_virtual_env": create_virtual_env,
-}
+DEBUG = False
 
 # Tools
 tools = [
@@ -142,7 +77,7 @@ tools = [
                 "properties": {
                     "file_name": {
                         "type": "string",
-                        "description": """The Python file to be run.""",
+                        "description": """The full path of the Python file to be run.""",
                     },
                     "directory": {
                         "type": "string",
@@ -163,12 +98,65 @@ tools = [
     {
         "type": "function",
         "function": {
+            "name": "create_project_directory",
+            "description": """Create a project directory for a web application. The directory should always start with
+            'auto/' and end with a suffix that briefly describes the coding project in CamelCase.""",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "directory": {
+                        "type": "string",
+                        "description": """The directory in which the code development will take place. Please preface
+                        this directory with 'auto/' and end with a suffix that briefly describes the coding project in
+                        CamelCase.""",
+                    },
+                },
+                "required": ["directory"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "initialize_react_app",
+            "description": """Initializes a vanilla React app with Chakra UI for frontend components in the project
+            directory specified.""",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "directory": {
+                        "type": "string",
+                        "description": """The directory in which the code development will take place.""",
+                    },
+                },
+                "required": ["directory"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "deploy_app_to_netlify",
+            "description": """Deploys the React app to netlify. On a successful function call, please display the
+            Website URL for the user to access the application online.""",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "directory": {
+                        "type": "string",
+                        "description": """The project directory. This should never have '/my-app' as a suffix.""",
+                    },
+                },
+                "required": ["directory"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "create_virtual_env",
             "description": """Create a Python virtual environment for future code development.
-            Please include contents for any requirements file that will be installed using pip.
-            Only create one virtual environment per user input, which can store all the necessary
-            requirements. Make sure the virtual environment is created before any additional work
-            is done on any code project.""",
+            Please include contents for any requirements file that will be installed using pip.""",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -184,6 +172,36 @@ tools = [
                     },
                 },
                 "required": ["directory", "requirements_content"],
+            },
+        },
+    },
+]
+
+tools2 = [
+    {
+        "type": "function",
+        "function": {
+            "name": "invoke_software_engineer",
+            "description": """Understand the outline, build the project directory, and write the actual code""",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "system_prompt": {
+                        "type": "string",
+                        "description": """This is a system prompt for another AI Assistant that would make it
+                        as helpful as possible for the user. For example, if the user task is 'Detect and fix bugs
+                        in Python code', this argument can be something like 'Your task is to analyze the provided
+                        Python code snippet, identify any bugs or errors present, and provide a corrected version of
+                        the code that resolves these issues. The corrected code should be functional, efficient, and
+                        adhere to best practices in Python programming'. The system prompt should be no more than
+                        three sentences long..""",
+                    },
+                    "instructions": {
+                        "type": "string",
+                        "description": """The instructions for the coding project.""",
+                    },
+                },
+                "required": ["system_prompt", "instructions"],
             },
         },
     },
@@ -230,10 +248,6 @@ class EventHandler(AssistantEventHandler):
             print(f"run_status: {current_run.status}")
         if current_run.status == "requires_action":
             tool_outputs = []
-            if DEBUG:
-                print(
-                    f"Tool calls: {current_run.required_action.submit_tool_outputs.tool_calls}"
-                )
             for tool_call in current_run.required_action.submit_tool_outputs.tool_calls:
                 if tool_call.type == "function":
                     function_name = tool_call.function.name
@@ -267,19 +281,39 @@ MY_ASSISTANTS = {
     "planner": {
         "system_prompt": """You are a high level planner for a group of other GPTs that code.
         You will be given a task, or updates about the progress on tasks, and be expected to
-        plan or replan. Output a list of single bullet points, each of which look something like
-        'Set up the project directory and initialize the web app with React' or 'Write the backend'.
-        Always use React for front-end, AWS for cloud, Flask for back-end, and Netlify for deployment.
-        Make similar types of design and implementation decisions yourself.
+        plan or replan. First output a list of single bullet points, each of which look something like
+        'Set up the project directory and initialize the web app with React'. Always use React for front-end
+        and Netlify for deployment. Make similar types of design and implementation decisions yourself.
         
-        If possible, give a clear directory structure of any code project that you are given.
+        After laying out your project plan, begin by initializing a project directory and building a relevant
+        Python virtual environment that contains all the necessary modules that you might need to tackle the project.
+        For miscellaneous Python scripts, always include a '__main__' clause at the end in case the user wants
+        to call the script from the command line. If the user wants to run the program, be sure to create the
+        virtual environment first.
+                
+        For any web app coding project you are given, proceed by creating a vanilla React app with Chakra UI
+        for frontend components in the project. Create and write the necessary Python and Javascript files
+        needed for the web application. Code development should  always happen in the 'my-app'
+        subdirectory of your project directory. For example, you should be writing the main frontend code in
+        'my-app/src/App.js', though feel free to create other files as needed. Proceed down the action items
+        in your bullet point list as much as you can, which includes writing code for the project.
+        Always assume the user wants you to proceed with any code development without asking for additional affirmation.
+        Avoid using deprecated functions in code development.
+        When you are finished coding, deploy the app to Netlify and give the user a link to the website.
+        Ask if the user has any additional requests regarding the coding project. If the user has a request, make
+        the relevant changes and re-deploy the website to Netlify. Re-link the user to the website.""",
+        "description": "The high-level planner of a project",
+    },
+    "planner2": {
+        "system_prompt": """You are a high level planner for a group of other GPTs that code.
+        You will be given a task, or updates about the progress on tasks, and be expected to plan or replan.
+        First output a list of single bullet points, each of which look something like
+        'Set up the project directory and initialize the web app with React'. Always use React for
+        front-end, Flask for backend, and Netlify for deployment. Make similar types of design
+        and implementation decisions yourself.
         
-        If prompted to create a virtual environment, build the environment in the parent directory
-        of the suggested project directory structure. Do not build more than one virtual environment.
-        Create the virtual environment before writing any code.
-        
-        Always assume that the user wants you to proceed with any code development without asking for
-        additional affirmation.""",
+        After coming up with a plan, proceed down the action items in your bullet point list. Always
+        assume the user wants you to continue with any code development without asking for additional affirmation.""",
         "description": "The high-level planner of a project",
     },
     "driver": {
