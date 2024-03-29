@@ -22,6 +22,27 @@ tools = [
     {
         "type": "function",
         "function": {
+            "name": "copy_file",
+            "description": """Copy a file from any location to another directory.""",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "file_name": {
+                        "type": "string",
+                        "description": """The file name. This should contain the full path of the file.""",
+                    },
+                    "directory": {
+                        "type": "string",
+                        "description": "The directory to copy the file into.",
+                    },
+                },
+                "required": ["file_name", "directory"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "write_python_file",
             "description": """Create and write a Python file for the user. Only use for Python files.
             Do not use for any other language.""",
@@ -116,6 +137,23 @@ tools = [
                     },
                 },
                 "required": ["file_name", "directory"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "open_png_file",
+            "description": """Opens a png file.""",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "file_name": {
+                        "type": "string",
+                        "description": """The full path of the png file to be opened.""",
+                    },
+                },
+                "required": ["file_name"],
             },
         },
     },
@@ -332,7 +370,8 @@ MY_ASSISTANTS = {
         Python virtual environment that contains all the necessary modules that you might need to tackle the project.
         For miscellaneous Python scripts, always include a '__main__' clause at the end in case the user wants
         to call the script from the command line. If the user wants to run the program, be sure to create the
-        virtual environment first.
+        virtual environment first. If you get an error after running a script, give the user a brief description of
+        what the error was.
                 
         For any web app coding project you are given, proceed by creating a vanilla React app with Chakra UI
         for frontend components in the project. Create and write the necessary Python and Javascript files

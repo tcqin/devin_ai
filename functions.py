@@ -5,14 +5,28 @@ import json
 import subprocess
 
 
+def copy_file(args):
+    # Decode arguments
+    file_name = args.get("file_name")
+    directory = args.get("directory")
+    if not os.path.isdir(directory):
+        subprocess.run(["mkdir", directory])
+    subprocess.run(["cp", file_name, directory])
+    status_message = f"Successfully copied {file_name} to {directory}"
+    print(status_message)
+    return json.dumps({"status": status_message})
+    return write_file(file_name, file_contents)
+
+
 def write_file(file_name, file_contents):
     # Write the script to file_name
     os.makedirs(os.path.dirname(file_name), exist_ok=True)
     f = open(file_name, "w")
     f.write(file_contents)
     f.close()
-    print(f"Wrote contents to {file_name} successfully!")
-    return json.dumps({"file_name": file_name})
+    status_message = f"Wrote contents to {file_name} successfully!"
+    print(status_message)
+    return json.dumps({"status": status_message})
 
 
 def write_css_file(args):
@@ -42,11 +56,28 @@ def run_python_script(args):
     directory = args.get("directory")
     arguments = args.get("arguments", [])
     # Run the python script
-    output = subprocess.run(
-        [f"{directory}/venv/bin/python", file_name] + arguments, capture_output=True
-    ).stdout
-    print(f"Output: {output}")
-    return json.dumps({"output": str(output)})
+    p = subprocess.Popen(
+        [f"{directory}/venv/bin/python", file_name] + arguments,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    output, error = p.communicate()
+    return json.dumps({"output": str(output), "error": str(error)})
+
+
+def open_png_file(args):
+    # Decode arguments
+    file_name = args.get("file_name")
+    # Run the python script
+    p = subprocess.Popen(
+        ["open", file_name],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    output, error = p.communicate()
+    return json.dumps({"output": str(output), "error": str(error)})
 
 
 def create_project_directory(args):
@@ -54,7 +85,9 @@ def create_project_directory(args):
     directory = args.get("directory")
     if not os.path.isdir(directory):
         subprocess.run(["mkdir", directory])
-    return json.dumps({"directory": directory})
+    status_message = f"Successfully created {directory}"
+    print(status_message)
+    return json.dumps({"status": status_message})
 
 
 def initialize_react_app(args):
@@ -66,7 +99,9 @@ def initialize_react_app(args):
     subprocess.run(["npx", "create-react-app", "my-app"], cwd=directory)
     subprocess.run(["npm", "install", "@chakra-ui/react"], cwd=f"{directory}/my-app")
     subprocess.run(["npm", "install", "netlify-cli"], cwd=f"{directory}/my-app")
-    return json.dumps({"directory": directory})
+    status_message = f"Successfully initialized React app in {directory}"
+    print(status_message)
+    return json.dumps({"status": status_message})
 
 
 def deploy_app_to_netlify(args):
@@ -81,10 +116,11 @@ def deploy_app_to_netlify(args):
         cwd=f"{directory}/my-app",
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
     )
 
     # Wait for the prompt to come up
-    time.sleep(2)
+    time.sleep(5)
 
     # Helper function for interacting with the terminal
     def send_input(process, bytes):
@@ -102,7 +138,7 @@ def deploy_app_to_netlify(args):
     send_input(p, b"\n")
 
     output, error = p.communicate()
-    return json.dumps({"output": str(output)})
+    return json.dumps({"output": str(output), "error": str(error)})
 
 
 def redeploy_app_to_netlify(args):
@@ -117,10 +153,10 @@ def redeploy_app_to_netlify(args):
         cwd=f"{directory}/my-app",
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
     )
-
     output, error = p.communicate()
-    return json.dumps({"output": str(output)})
+    return json.dumps({"output": str(output), "error": str(error)})
 
 
 def create_virtual_env(args):
@@ -137,20 +173,29 @@ def create_virtual_env(args):
     # Create the environment and install relevant requirements
     venv_location = os.path.join(directory, "venv")
     venv.create(venv_location, with_pip=True)
-    subprocess.run(
-        [f"{directory}/venv/bin/pip", "install", "-r", f"{directory}/requirements.txt"]
+    p = subprocess.Popen(
+        [f"{directory}/venv/bin/pip", "install", "-r", f"{directory}/requirements.txt"],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
     )
-    return json.dumps({"directory": directory})
+    output, error = p.communicate()
+    print(f"Successfully created a virtual environment in {directory}")
+    return json.dumps({"output": str(output), "error": str(error)})
 
 
 # All available functions
 available_functions = {
+    # For copying
+    "copy_file": copy_file,
     # For writing
     "write_css_file": write_css_file,
     "write_python_file": write_python_file,
     "write_javascript_file": write_javascript_file,
     # For running
     "run_python_script": run_python_script,
+    # For opening files
+    "open_png_file": open_png_file,
     # Virtual environments
     "create_virtual_env": create_virtual_env,
     # Create project directory
