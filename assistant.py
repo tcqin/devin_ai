@@ -70,6 +70,30 @@ tools = [
     {
         "type": "function",
         "function": {
+            "name": "write_css_file",
+            "description": """Create and write a CSS file for the user. Only use for CSS files.
+            Do not use for any other language such as bash scripts.""",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "file_name": {
+                        "type": "string",
+                        "description": """The file name. This should be prefaced by the same directory
+                        that the rest of the project is being built in. If there is no current project
+                        being worked on, then default to beginning the file name with 'auto/'.""",
+                    },
+                    "file_contents": {
+                        "type": "string",
+                        "description": "The contents of the CSS file.",
+                    },
+                },
+                "required": ["file_name", "file_contents"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "run_python_script",
             "description": """Runs a Python script using the virtual environment directory supplied.""",
             "parameters": {
@@ -139,6 +163,25 @@ tools = [
             "name": "deploy_app_to_netlify",
             "description": """Deploys the React app to netlify. On a successful function call, please display the
             Website URL for the user to access the application online.""",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "directory": {
+                        "type": "string",
+                        "description": """The project directory. This should never have '/my-app' as a suffix.""",
+                    },
+                },
+                "required": ["directory"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "redeploy_app_to_netlify",
+            "description": """Re-deploy the React app to netlify. Only call if the web app has already been deployed
+            to netlify on a previous call. On a successful function call, please display the website URL for the user
+            to access the web app online.""",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -279,11 +322,11 @@ MY_ASSISTANTS = {
         "description": "The default assistant.",
     },
     "planner": {
-        "system_prompt": """You are a high level planner for a group of other GPTs that code.
-        You will be given a task, or updates about the progress on tasks, and be expected to
-        plan or replan. First output a list of single bullet points, each of which look something like
-        'Set up the project directory and initialize the web app with React'. Always use React for front-end
-        and Netlify for deployment. Make similar types of design and implementation decisions yourself.
+        "system_prompt": """You are a high level planner. You will be given a task, or updates about the
+        progress on tasks, and be expected to plan or replan. First output a list of single bullet points,
+        each of which look something like 'Set up the project directory and initialize the web app with React'.
+        Always use React for front-end and Netlify for deployment. Make similar types of design and
+        implementation decisions yourself.
         
         After laying out your project plan, begin by initializing a project directory and building a relevant
         Python virtual environment that contains all the necessary modules that you might need to tackle the project.
@@ -294,8 +337,8 @@ MY_ASSISTANTS = {
         For any web app coding project you are given, proceed by creating a vanilla React app with Chakra UI
         for frontend components in the project. Create and write the necessary Python and Javascript files
         needed for the web application. Code development should  always happen in the 'my-app'
-        subdirectory of your project directory. For example, you should be writing the main frontend code in
-        'my-app/src/App.js', though feel free to create other files as needed. Proceed down the action items
+        subdirectory of your project directory. For example, you should be writing the main frontend code in the
+        'my-app/src/' directory, though feel free to create other files as needed. Proceed down the action items
         in your bullet point list as much as you can, which includes writing code for the project.
         Always assume the user wants you to proceed with any code development without asking for additional affirmation.
         Avoid using deprecated functions in code development.

@@ -15,6 +15,13 @@ def write_file(file_name, file_contents):
     return json.dumps({"file_name": file_name})
 
 
+def write_css_file(args):
+    # Decode arguments
+    file_name = args.get("file_name")
+    file_contents = args.get("file_contents")
+    return write_file(file_name, file_contents)
+
+
 def write_python_file(args):
     # Decode arguments
     file_name = args.get("file_name")
@@ -98,6 +105,24 @@ def deploy_app_to_netlify(args):
     return json.dumps({"output": str(output)})
 
 
+def redeploy_app_to_netlify(args):
+    # Decode arguments
+    directory = args.get("directory")
+    # Build the React app
+    p = subprocess.Popen(["npm", "run", "build"], cwd=f"{directory}/my-app")
+    p.wait()
+    # Deploy to netlify
+    p = subprocess.Popen(
+        ["netlify", "deploy", "--dir", "./build", "--prod"],
+        cwd=f"{directory}/my-app",
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+    )
+
+    output, error = p.communicate()
+    return json.dumps({"output": str(output)})
+
+
 def create_virtual_env(args):
     # Decode arguments
     directory = args.get("directory")
@@ -121,6 +146,7 @@ def create_virtual_env(args):
 # All available functions
 available_functions = {
     # For writing
+    "write_css_file": write_css_file,
     "write_python_file": write_python_file,
     "write_javascript_file": write_javascript_file,
     # For running
@@ -131,4 +157,5 @@ available_functions = {
     "create_project_directory": create_project_directory,
     "initialize_react_app": initialize_react_app,
     "deploy_app_to_netlify": deploy_app_to_netlify,
+    "redeploy_app_to_netlify": redeploy_app_to_netlify,
 }
