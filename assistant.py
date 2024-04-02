@@ -12,7 +12,7 @@ from typing_extensions import override
 from openai import AssistantEventHandler
 
 # For Debugging reasons
-DEBUG = True
+DEBUG = False
 
 # Tools
 tools = [
@@ -351,9 +351,8 @@ MY_ASSISTANTS = {
         the user to the website. On errors, give the user a brief description of what the error was and try to fix
         the error yourself.
         
-        If there is a question you can't answer, start by making a Google search. If that's not sufficient, read the
-        url_links from the Google search and search relevant websites for useful information without additional
-        prompting from the user.""",
+        If there is a question you can't answer, search Google to find the answer. If you get a list of relevant URLs,
+        visit those websites to find the answer for the user without further prompting.""",
         "description": "The high-level planner of a project",
     },
     ### Placeholder code for additional assistants to manage particular subtasks ###
