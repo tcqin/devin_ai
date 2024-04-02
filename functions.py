@@ -3,6 +3,9 @@ import time
 import venv
 import json
 import subprocess
+from bs4 import BeautifulSoup
+from requests import get
+from selenium import webdriver
 
 
 def copy_file(args):
@@ -18,7 +21,10 @@ def copy_file(args):
     return write_file(file_name, file_contents)
 
 
-def write_file(file_name, file_contents):
+def write_file(args):
+    # Decode arguments
+    file_name = args.get("file_name")
+    file_contents = args.get("file_contents")
     # Write the script to file_name
     os.makedirs(os.path.dirname(file_name), exist_ok=True)
     f = open(file_name, "w")
@@ -27,27 +33,6 @@ def write_file(file_name, file_contents):
     status_message = f"Wrote contents to {file_name} successfully!"
     print(status_message)
     return json.dumps({"status": status_message})
-
-
-def write_css_file(args):
-    # Decode arguments
-    file_name = args.get("file_name")
-    file_contents = args.get("file_contents")
-    return write_file(file_name, file_contents)
-
-
-def write_python_file(args):
-    # Decode arguments
-    file_name = args.get("file_name")
-    file_contents = args.get("file_contents")
-    return write_file(file_name, file_contents)
-
-
-def write_javascript_file(args):
-    # Decode arguments
-    file_name = args.get("file_name")
-    file_contents = args.get("file_contents")
-    return write_file(file_name, file_contents)
 
 
 def run_python_script(args):
@@ -184,14 +169,43 @@ def create_virtual_env(args):
     return json.dumps({"output": str(output), "error": str(error)})
 
 
+################### HELPER FUNCTIONS FOR WEBSITES ###################
+def remove_tags(html):
+    soup = BeautifulSoup(html, "html.parser")
+    for data in soup(["style", "script"]):
+        data.decompose()
+    return " ".join(soup.stripped_strings)
+
+
+def search_google(args):
+    # Decode arguments
+    query = args.get("query")
+    url = f"https://www.google.com/search?q={query.replace(' ', '+')}"
+    browser = webdriver.Chrome()
+    browser.get(url)
+    # Get raw text from the page
+    extracted_data = remove_tags(browser.page_source)
+    # Get links on the page
+    link_elements = browser.find_elements("xpath", "//a[@href]")
+    links = [link.get_attribute("href") for link in link_elements]
+    return json.dumps({"text_on_page": extracted_data, "url_links": links})
+
+
+def search_website(args):
+    # Decode arguments
+    url = args.get("url")
+    browser = webdriver.Chrome()
+    browser.get(url)
+    # Get raw text from the page
+    extracted_data = remove_tags(browser.page_source)
+    return json.dumps({"text_on_page": extracted_data})
+
+
 # All available functions
 available_functions = {
-    # For copying
+    # For working with files
     "copy_file": copy_file,
-    # For writing
-    "write_css_file": write_css_file,
-    "write_python_file": write_python_file,
-    "write_javascript_file": write_javascript_file,
+    "write_file": write_file,
     # For running
     "run_python_script": run_python_script,
     # For opening files
@@ -203,4 +217,6 @@ available_functions = {
     "initialize_react_app": initialize_react_app,
     "deploy_app_to_netlify": deploy_app_to_netlify,
     "redeploy_app_to_netlify": redeploy_app_to_netlify,
+    "search_google": search_google,
+    "search_website": search_website,
 }

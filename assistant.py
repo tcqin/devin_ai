@@ -12,7 +12,7 @@ from typing_extensions import override
 from openai import AssistantEventHandler
 
 # For Debugging reasons
-DEBUG = False
+DEBUG = True
 
 # Tools
 tools = [
@@ -43,12 +43,17 @@ tools = [
     {
         "type": "function",
         "function": {
-            "name": "write_python_file",
-            "description": """Create and write a Python file for the user. Only use for Python files.
-            Do not use for any other language.""",
+            "name": "write_file",
+            "description": """Create and write a file for the user in the language specified as an argument.
+            The extension of the file name must match the language that you are writing in.""",
             "parameters": {
                 "type": "object",
                 "properties": {
+                    "language": {
+                        "type": "string",
+                        "description": """The language of the file. This could be any one of, but not limited to,
+                        Python, CSS, Javascript, C++, or text.""",
+                    },
                     "file_name": {
                         "type": "string",
                         "description": """The file name. This should be prefaced by the same directory
@@ -60,55 +65,7 @@ tools = [
                         "description": "The contents of the Python file.",
                     },
                 },
-                "required": ["file_name", "file_contents"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "write_javascript_file",
-            "description": """Create and write a Javascript file for the user. Only use for Javascript files.
-            Do not use for any other language such as bash scripts.""",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "file_name": {
-                        "type": "string",
-                        "description": """The file name. This should be prefaced by the same directory
-                        that the rest of the project is being built in. If there is no current project
-                        being worked on, then default to beginning the file name with 'auto/'.""",
-                    },
-                    "file_contents": {
-                        "type": "string",
-                        "description": "The contents of the Javascript file.",
-                    },
-                },
-                "required": ["file_name", "file_contents"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "write_css_file",
-            "description": """Create and write a CSS file for the user. Only use for CSS files.
-            Do not use for any other language such as bash scripts.""",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "file_name": {
-                        "type": "string",
-                        "description": """The file name. This should be prefaced by the same directory
-                        that the rest of the project is being built in. If there is no current project
-                        being worked on, then default to beginning the file name with 'auto/'.""",
-                    },
-                    "file_contents": {
-                        "type": "string",
-                        "description": "The contents of the CSS file.",
-                    },
-                },
-                "required": ["file_name", "file_contents"],
+                "required": ["language", "file_name", "file_contents"],
             },
         },
     },
@@ -256,33 +213,37 @@ tools = [
             },
         },
     },
-]
-
-tools2 = [
     {
         "type": "function",
         "function": {
-            "name": "invoke_software_engineer",
-            "description": """Understand the outline, build the project directory, and write the actual code""",
+            "name": "search_google",
+            "description": """Make a google search.""",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "system_prompt": {
+                    "query": {
                         "type": "string",
-                        "description": """This is a system prompt for another AI Assistant that would make it
-                        as helpful as possible for the user. For example, if the user task is 'Detect and fix bugs
-                        in Python code', this argument can be something like 'Your task is to analyze the provided
-                        Python code snippet, identify any bugs or errors present, and provide a corrected version of
-                        the code that resolves these issues. The corrected code should be functional, efficient, and
-                        adhere to best practices in Python programming'. The system prompt should be no more than
-                        three sentences long..""",
-                    },
-                    "instructions": {
-                        "type": "string",
-                        "description": """The instructions for the coding project.""",
+                        "description": """The query to search.""",
                     },
                 },
-                "required": ["system_prompt", "instructions"],
+                "required": ["query"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "search_website",
+            "description": """Search a website to get relevant information.""",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "url": {
+                        "type": "string",
+                        "description": """The URL of the website to search.""",
+                    },
+                },
+                "required": ["url"],
             },
         },
     },
@@ -355,54 +316,53 @@ class EventHandler(AssistantEventHandler):
 
 # Assistants
 MY_ASSISTANTS = {
+    ### The very default assistant
     "default": {
         "system_prompt": "You are a helpful assistant.",
         "description": "The default assistant.",
     },
+    ### The main assistant
     "planner": {
         "system_prompt": """You are a high level planner. You will be given a task, or updates about the
         progress on tasks, and be expected to plan or replan. First output a list of single bullet points,
         each of which look something like 'Set up the project directory and initialize the web app with React'.
         Always use React for front-end and Netlify for deployment. Make similar types of design and
-        implementation decisions yourself.
+        implementation decisions yourself. You are very resourceful and you can proceed with the user's requests
+        without additional prompting from the user unless you are stuck.
         
         After laying out your project plan, begin by initializing a project directory and building a relevant
         Python virtual environment that contains all the necessary modules that you might need to tackle the project.
         For miscellaneous Python scripts, always include a '__main__' clause at the end in case the user wants
         to call the script from the command line. If the user wants to run the program, be sure to create the
         virtual environment first. If you get an error after running a script, give the user a brief description of
-        what the error was.
+        what the error was and try to fix the error.
                 
         For any web app coding project you are given, proceed by creating a vanilla React app with Chakra UI
-        for frontend components in the project. Create and write the necessary Python and Javascript files
-        needed for the web application. Code development should  always happen in the 'my-app'
-        subdirectory of your project directory. For example, you should be writing the main frontend code in the
-        'my-app/src/' directory, though feel free to create other files as needed. Proceed down the action items
-        in your bullet point list as much as you can, which includes writing code for the project.
-        Always assume the user wants you to proceed with any code development without asking for additional affirmation.
-        Avoid using deprecated functions in code development.
-        When you are finished coding, deploy the app to Netlify and give the user a link to the website.
-        Ask if the user has any additional requests regarding the coding project. If the user has a request, make
-        the relevant changes and re-deploy the website to Netlify. Re-link the user to the website.""",
-        "description": "The high-level planner of a project",
-    },
-    "planner2": {
-        "system_prompt": """You are a high level planner for a group of other GPTs that code.
-        You will be given a task, or updates about the progress on tasks, and be expected to plan or replan.
-        First output a list of single bullet points, each of which look something like
-        'Set up the project directory and initialize the web app with React'. Always use React for
-        front-end, Flask for backend, and Netlify for deployment. Make similar types of design
-        and implementation decisions yourself.
+        for frontend components in the project. Create and write the necessary Python, Javascript, and CSS files
+        needed for the web application. For now, write everything in the frontend code. Development should always
+        happen in the 'my-app' subdirectory of your project directory. For example, you should be writing the main
+        frontend code in the 'my-app/src/' directory, though feel free to create other files as needed. Proceed down
+        the action items in your bullet point list as much as you can, which includes writing code for the project.
         
-        After coming up with a plan, proceed down the action items in your bullet point list. Always
-        assume the user wants you to continue with any code development without asking for additional affirmation.""",
+        Always assume the user wants you to proceed with any code development without asking for additional affirmation.
+        Avoid using deprecated functions in code development. When you are finished coding, deploy the app to Netlify
+        and give the user a link to the website. Ask if the user has any additional requests regarding the coding
+        project. If the user has a request, make the relevant changes and re-deploy the website to Netlify. Re-link
+        the user to the website. On errors, give the user a brief description of what the error was and try to fix
+        the error yourself.
+        
+        If there is a question you can't answer, start by making a Google search. If that's not sufficient, read the
+        url_links from the Google search and search relevant websites for useful information without additional
+        prompting from the user.""",
         "description": "The high-level planner of a project",
     },
+    ### Placeholder code for additional assistants to manage particular subtasks ###
     "driver": {
         "system_prompt": """You are an engineering manager, who takes a single task, and turns it into
         bite-sized tasks that an engineer can perform with no ambiguity.""",
         "description": "The engineering manager",
     },
+    ### Maybe we can have an assistant dynamically write system prompts for other assistants
     "prompter": {
         "system_prompt": """You are an expert at system prompting AI Assistants. Your goal is to take a
         task from the user, and return a system prompt for another AI Assistant that would make it
@@ -413,12 +373,6 @@ MY_ASSISTANTS = {
         adhere to best practices in Python programming'. Your system prompt should be no more than
         three sentences long.""",
         "description": "The assistant prompter",
-    },
-    "venv_builder": {
-        "system_prompt": """You are an expert software engineer. Your task is to follow instructions from
-        the user to build one virtual environment and install all the necessary package dependencies
-        required. Do not build more than one virtual environment.""",
-        "description": "The virtual environment builder",
     },
 }
 
@@ -437,6 +391,10 @@ thread = client.beta.threads.create()
 iteration = 0
 while True:
     # Formatting reasons
+    if DEBUG:
+        print(
+            "Debug mode is currently on. To turn it off, toggle the DEBUG boolean at the top of assistant.py"
+        )
     x = input("\nUser > " if iteration == 0 else "\n\nUser > ")
 
     # Allow user to exit
